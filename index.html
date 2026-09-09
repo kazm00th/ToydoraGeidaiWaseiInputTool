@@ -185,20 +185,27 @@ const FORMS = [
 const ORDER = [
   "chordPM",   // 濃赤: ^ -            （和音のプラス／マイナス）
   "chordQ",    // 濃赤: 8 9            （和音の準固有／同主固有）
-  "innerQ",    // 赤:   ( )            （内部調の準固有／同主固有）
   "innerPM",   // 赤:   ~ =            （内部調のプラス／マイナス）
-  "innerHat",  // 紫トグル: Y          （内部調の変位VII調のハット）
+  "innerQ",    // 赤:   ( )            （内部調の準固有／同主固有）
+  "innerHat",  // 紫トグル: Y          （内部調の変位VII）
   "innerDeg",  // 紫:   ! 〜 ' P
-  "special",   // 黄トグル: E ナポリII / R 変位VII（旧字体 y）
+  "special",   // 黄トグル: E ナポリII / R 変位VII
   "omit",      // 黄トグル: /          （根省・5省）
   "alter",     // 黄トグル: Q ↑ / W ↓
   "degree",    // 黄:   1 〜 7 p
-  "form",      // 黄緑: q w …（形体指数・付加音）
-  "inv"        // 水色: a s d f g h l
+  "form",      // 黄緑: 形体指数 q w o（＋J K）… 転回指数より前
+  "inv",       // 水色: a s d f g h l
+  "add"        // 黄緑: 付加音 A S D F G H L … 転回指数より後
 ];
 
-/* 転調表記の外側（括弧の左）。マニュアル例 `~#[…]` `T"[…]` `)#[…]` と同じ並び。 */
-const MOD_ORDER = ["modQ","modPM","modDeg"];
+/* 転調表記の外側（括弧の左）。 */
+const MOD_ORDER = ["modPM","modQ","modDeg"];
+
+/* 形体指数（転回指数より前に出す）と付加音（転回指数より後に出す）の判別。
+   マニュアルの入力順 `… / Q 1 q J a A` のとおり、q(形体指数) → a(転回) → A(付加音)。
+   `2 Ss`（付加音→転回）では両者の左端がずれ、`2 sS`（転回→付加音）でそろう。 */
+const ADD_KEYS = "ASDFGHL";
+const isAdd = v => !!v && ADD_KEYS.includes(v[0]);
 
 const OPEN_PAREN = "[", CLOSE_PAREN = "]";
 
@@ -210,15 +217,17 @@ const SPACING = {
   "open>chordPM"  : 0,   // 開き括弧 と 中身の先頭
   "chordPM>*"     : 1,   // プラス／マイナスの後
   "chordQ>*"      : 1,   // 準・同主固有の後
+  "innerPM>innerQ": 6,   // ~ = と ( ) はインクがほぼ同位置（3〜19 と 2〜18）なので離す
+  "modPM>modQ"    : 6,   // 転調表記側も同じ
   "innerPM>*"     : 1,
-  "innerQ>innerPM": 6,   // ( ) と ~ = はインクがほぼ同位置（2〜18 と 3〜19）なので離す
-  "modQ>modPM"    : 6,   // 転調表記側も同じ
   "innerQ>*"      : 0,   // ( ) は上付きなので度数に密着させる
   "innerDeg>*"    : 0,
-  "degree>form"   : 1,   // 和音の度数 と 形体指数・付加音
+  "degree>form"   : 1,   // 和音の度数 と 形体指数
   "degree>inv"    : 1,   // 和音の度数 と 転回指数
   "form>inv"      : 0,
-  "last>close"    : 1    // 中身の末尾 と 閉じ括弧
+  "inv>add"       : 0,
+  "degree>add"    : 1,
+  "last>close"    : 1    // 中身の末尾 と 閉じ括弧（幅0グリフのときは実測で上書き）
 };
 
 /* 和音の度数の直前に入れるスペース数（度数ごと）。
@@ -229,8 +238,41 @@ const SPACING = {
    （100px で描画してインクの水平中心を実測し決定した値） */
 const DEGREE_LEAD = { "1":3, "2":2, "3":1, "4":0, "5":1, "6":0, "7":0, "p":1 };
 
-/* 幅0の合成グリフ。これが度数の前にあるときだけ DEGREE_LEAD を適用する。 */
+/* 変位VII `R`（インク 15〜46、中心 30.5）を度数字の横中心にそろえるためのスペース数。
+   度数字の中心は I:15.5 II:18 III:24 IV:28 V:21.5 VI:25 VII:29.5 □:19.5。 */
+const R_LEAD = { "1":4, "2":4, "3":2, "4":1, "5":3, "6":2, "7":0, "p":3 };
+
+/* 上変 `Q`（インク 3〜9）／下変 `W`（インク −3〜6）が度数字の左上のセリフに
+   接するためのスペース数。度数字のインク左端は I:6 II:3 III:3 IV:3 V:0 VI:0 VII:1 □:0。 */
+const ALTER_LEAD = {
+  "Q": { "1":1, "2":2, "3":2, "4":2, "5":3, "6":3, "7":2, "p":3 },
+  "W": { "1":0, "2":1, "3":1, "4":1, "5":2, "6":2, "7":1, "p":2 }
+};
+
+/* 幅0の合成グリフ。これが度数の前にあるときだけ度数用のリードを適用する。 */
 const ZERO_WIDTH_PREFIX = ["innerHat","innerDeg","special","omit","alter","innerQ","innerPM"];
+
+/* 幅0グリフのインク右端（100px 実測）。閉じ括弧 `]`（インク 3〜13）が
+   これらに重ならないよう、直前に入れるスペース数の算出に使う。 */
+const ZW_INK_RIGHT = {
+  "q":16,"w":16,"o":20,"qJ":23,"qK":25,"wJ":23,"wK":25,
+  "a":15,"s":16,"d":15,"f":16,"g":16,"h":16,"l":20
+};
+const SPACE_PX = 3.515625;   // 100px 描画時の半角スペース幅
+
+/* 度数の直前に入れるスペース数。何が度数に重なるかで基準が変わる。 */
+function degreeLead(deg){
+  if (st.alter) return (ALTER_LEAD[st.alter] || {})[deg] || 0;
+  if (st.special === "R" || st.special === "y") return R_LEAD[deg] || 0;
+  return DEGREE_LEAD[deg] || 0;
+}
+
+/* 閉じ括弧の直前に入れるスペース数。直前が幅0グリフのときだけ実測値から算出する。 */
+function closeLead(lastKey){
+  const r = ZW_INK_RIGHT[lastKey];
+  if (r === undefined) return SPACING["last>close"];
+  return Math.ceil((r + 3) / SPACE_PX);
+}
 
 /* 上付きの修飾（( ) ~ =、インク右端 19px）の直後に上付き度数を置くときの
    スペース数。上付き度数はどれも中心 26px だが左端が度数ごとに違う
@@ -262,6 +304,10 @@ const st = {
 function innerPieces(){
   const out = [];
   for (const id of ORDER){
+    /* form スロットは値の種類で出す位置が変わる:
+       形体指数(q/w/o) は "form" の位置、付加音(A〜L) は "add"（転回指数の後）。 */
+    if (id === "form" && isAdd(st.form)) continue;
+    if (id === "add"){ if (isAdd(st.form)) out.push(["add", st.form]); continue; }
     const v = st[id];
     if (v) out.push([id, v]);
   }
@@ -286,7 +332,7 @@ function build(){
     if (i > 0){
       const prev = pieces[i-1][0];
       if (id === "degree" && hasMark && SPACING_ON){
-        inner += " ".repeat(DEGREE_LEAD[v] || 0);
+        inner += " ".repeat(degreeLead(v));
       } else if (id === "innerDeg" && SPACING_ON && (prev === "innerQ" || prev === "innerPM")){
         inner += " ".repeat(UPPER_LEAD[v] || 0);
       } else {
@@ -318,7 +364,8 @@ function build(){
   }
   s += OPEN_PAREN;
   if (inner) s += " ".repeat(gap("open", pieces.length ? pieces[0][0] : "chordPM")) + inner;
-  s += " ".repeat(gap("last","close")) + CLOSE_PAREN;
+  const last = pieces.length ? pieces[pieces.length-1][1] : null;
+  s += " ".repeat(SPACING_ON ? closeLead(last) : 0) + CLOSE_PAREN;
   return s;
 }
 
@@ -344,8 +391,8 @@ function parse(raw){
     let p = s.slice(0, open);
     let j = 0;
     const tk = (set) => { if (j<p.length && set.includes(p[j])) return p[j++]; return ""; };
-    reset.modQ   = tk("()");
     reset.modPM  = tk("~=");
+    reset.modQ   = tk("()");
     reset.modDeg = tk(upperDegKeys);
     if (j < p.length) leftover += p.slice(j);
     s = s.slice(open+1);
@@ -356,8 +403,8 @@ function parse(raw){
 
   reset.chordPM  = take("^-");
   reset.chordQ   = take("89");
-  reset.innerQ   = take("()");
   reset.innerPM  = take("~=");
+  reset.innerQ   = take("()");
   reset.innerHat = take("Y");
   reset.innerDeg = take(upperDegKeys);
   reset.special  = take("ERy");
@@ -369,11 +416,12 @@ function parse(raw){
   if (i < s.length && "qwo".includes(s[i])){
     reset.form = s[i++];
     if (i < s.length && "JK".includes(s[i])) reset.form += s[i++];
-  } else if (i < s.length && "ASDFGHL".includes(s[i])){
-    reset.form = s[i++];
   }
 
   reset.inv = take("asdfghl");
+
+  /* 付加音は転回指数の後。ただし転回指数が無い `4A` のような形も受ける。 */
+  if (!reset.form && i < s.length && ADD_KEYS.includes(s[i])) reset.form = s[i++];
 
   if (i < s.length) leftover += s.slice(i);
   return {state:reset, leftover};
@@ -479,7 +527,7 @@ function buildStage(){
     const mDeg = slotEl("s-magenta","modDeg", DEG_UPPER, "内部調(転調表記)の度数");
     const wrap = document.createElement("div");
     wrap.style.cssText = "display:flex;flex-direction:column;gap:4px";
-    wrap.appendChild(mQ); wrap.appendChild(mPM);
+    wrap.appendChild(mPM); wrap.appendChild(mQ);
     c.appendChild(wrap); c.appendChild(mDeg);
     stage.appendChild(c);
     els.modPM = mPM; els.modQ = mQ; els.modDeg = mDeg;
@@ -496,14 +544,14 @@ function buildStage(){
   redWrap.style.cssText += ";display:flex;flex-direction:column;gap:4px";
   const iQ  = slotEl("s-red","innerQ",  MOD_UPPER.slice(0,2), "内部調の\n準/同主");
   const iPM = slotEl("s-red","innerPM", MOD_UPPER.slice(2),   "内部調の\n±");
-  redWrap.appendChild(iQ); redWrap.appendChild(iPM);
+  redWrap.appendChild(iPM); redWrap.appendChild(iQ);
   chord.appendChild(redWrap);
   els.innerQ = iQ; els.innerPM = iPM;
 
   // 紫（内部調の度数）＋ 変位VII調のハット Y トグル（内部調の度数の上に乗る記号）
   const iDeg = slotEl("s-purple","innerDeg", DEG_UPPER, "内部調の度数");
   iDeg.classList.add("cell-inner-deg");
-  attachToggles(iDeg, [["innerHat","Y","ハット"]]);
+  attachToggles(iDeg, [["innerHat","Y","変位VII"]]);
   chord.appendChild(iDeg);
   els.innerDeg = iDeg;
 
@@ -525,8 +573,7 @@ function buildStage(){
     ["alter","Q","上変↑"],
     ["alter","W","下変↓"],
     ["special","E","ナポリII"],
-    ["special","R","変位VII"],
-    ["special","y","変位VII(旧)"]
+    ["special","R","変位VII"]
   ]);
   chord.appendChild(yel);
   els.degree = yel;
@@ -556,18 +603,20 @@ function buildStage(){
 /* --- spacing tuning table --------------------------------------------- */
 const SP_LABELS = {
   "modDeg>open"  :"内部調(転調表記)の度数 → 開き括弧",
-  "innerQ>innerPM":"内部調の 準/同主固有 → プラス/マイナス",
-  "modQ>modPM"   :"転調表記の 準/同主固有 → プラス/マイナス",
+  "innerPM>innerQ":"内部調の プラス/マイナス → 準/同主固有",
+  "modPM>modQ"   :"転調表記の プラス/マイナス → 準/同主固有",
   "open>chordPM" :"開き括弧 → 中身の先頭",
   "chordPM>*"    :"プラス/マイナス（和音）の後",
   "chordQ>*"     :"準/同主固有（和音）の後",
   "innerPM>*"    :"プラス/マイナス（内部調）の後",
   "innerQ>*"     :"準/同主固有（内部調）の後",
   "innerDeg>*"   :"内部調の度数 の後",
-  "degree>form"  :"和音の度数 → 形体指数・付加音",
+  "degree>form"  :"和音の度数 → 形体指数",
+  "degree>add"   :"和音の度数 → 付加音",
+  "inv>add"      :"転回指数 → 付加音",
   "degree>inv"   :"和音の度数 → 転回指数",
   "form>inv"     :"形体指数 → 転回指数",
-  "last>close"   :"中身の末尾 → 閉じ括弧"
+  "last>close"   :"中身の末尾 → 閉じ括弧（幅0グリフのときは実測で上書き）"
 };
 function buildSpTable(){
   const t = document.createElement("table"); t.className = "sp";
@@ -600,7 +649,11 @@ function buildSpTable(){
     tr.appendChild(td1); tr.appendChild(td2); t.appendChild(tr);
   };
   const UPKEYS = ["!","\"","#","$","%","&","'","P"];
-  perDegRow("幅0グリフ → 和音の度数", DEGREE_LEAD, ["1","2","3","4","5","6","7","p"]);
+  const DEGKEYS = ["1","2","3","4","5","6","7","p"];
+  perDegRow("幅0グリフ → 和音の度数", DEGREE_LEAD, DEGKEYS);
+  perDegRow("変位VII R → 和音の度数（中心そろえ）", R_LEAD, DEGKEYS);
+  perDegRow("上変 Q → 和音の度数（セリフに接する）", ALTER_LEAD.Q, DEGKEYS);
+  perDegRow("下変 W → 和音の度数（セリフに接する）", ALTER_LEAD.W, DEGKEYS);
   perDegRow("上付きの修飾 ( ) ~ = → 内部調の度数", UPPER_LEAD, UPKEYS);
   perDegRow("転調表記の度数 → 開き括弧 [", PAREN_LEAD, UPKEYS);
 
