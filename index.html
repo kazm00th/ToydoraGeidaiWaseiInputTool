@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>トイドラ芸大和声フォント 和声記号 入力ツール</title>
+<style>
+  :root{
+    --magenta:#ff44ff; --orange:#e8822a; --purple:#7b2fa8; --red:#ee1111;
+    --darkred:#a80000; --yellow:#f5ab00; --cyan:#12a5e8; --green:#8ac43f;
+    --line:#333;
+  }
+  *{box-sizing:border-box}
+  body{font-family:"Meiryo","Yu Gothic UI",sans-serif;margin:0;padding:20px 24px 60px;
+       background:#fafafa;color:#222;font-size:14px}
+  h1{font-size:19px;margin:0 0 4px}
+  .sub{color:#666;font-size:12px;margin:0 0 8px}
+  .ver{font-size:12px;font-weight:normal;color:#b06000;vertical-align:middle;
+       border:1px solid #e0b070;background:#fff6e6;border-radius:4px;padding:2px 7px;margin-left:6px}
+  .alpha{font-size:12px;line-height:1.7;color:#7a4a00;background:#fff6e6;
+         border:1px solid #e8c98a;border-radius:6px;padding:9px 12px;margin:0 0 18px}
+  .panel{background:#fff;border:1px solid #ddd;border-radius:8px;padding:14px 16px;margin-bottom:16px}
+  .panel > h2{font-size:13px;color:#777;font-weight:normal;margin:0 0 10px;letter-spacing:.06em}
+
+  /* ---- preview ---- */
+  #preview{
+    font-family:"ToydoraGeidaiWasei","ToydoraGeidaiWasei-Regular",monospace;
+    font-size:64px;line-height:1.7;white-space:pre;min-height:110px;
+    padding:6px 10px;background:#fff;border:1px dashed #ccc;border-radius:6px;
+    overflow-x:auto;
+  }
+  #fontwarn{display:none;color:#b00;font-size:12px;margin-top:8px}
+
+  /* ---- structure view ---- */
+  .stage{display:flex;align-items:center;gap:0;flex-wrap:nowrap;overflow-x:auto;padding:8px 2px}
+  .paren{font-size:96px;line-height:.9;color:#111;font-family:serif;user-select:none;
+         transform:scaleX(.6);margin:0 -6px}
+  .cluster{display:flex;align-items:center;gap:6px}
+
+  /* the chord block: 3 columns x 3 rows grid mirroring the figure */
+  .chord{display:grid;grid-template-columns:auto auto auto;
+         grid-template-rows:auto auto auto;gap:5px;align-items:center;justify-items:center;
+         padding:6px 10px}
+  .cell-inner-mod {grid-column:1;grid-row:1;justify-self:end}
+  .cell-inner-deg {grid-column:2;grid-row:1}
+  .cell-chord-mod {grid-column:1;grid-row:2;justify-self:end}
+  .cell-degree    {grid-column:2;grid-row:2}
+  .cell-inv       {grid-column:3;grid-row:1;justify-self:start}
+  .cell-form      {grid-column:3;grid-row:3;justify-self:start}
+
+  .modal-cluster{display:grid;grid-template-columns:auto auto;gap:5px;align-items:center}
+
+  .slot{border:2px solid #2b2b2b;border-radius:2px;cursor:pointer;position:relative;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;
+        color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45);font-weight:bold;
+        padding:4px;text-align:center;line-height:1.25}
+  .slot:hover{outline:3px solid rgba(0,0,0,.28)}
+  .slot .val{font-size:13px}
+  .slot .ph{font-size:11px;opacity:.8;font-weight:normal}
+  .slot small{display:block;font-size:9.5px;font-weight:normal;opacity:.85}
+  .s-magenta{background:var(--magenta);width:92px;height:80px}
+  .s-orange {background:var(--orange); width:56px;height:56px}
+  .s-purple {background:var(--purple); width:84px;height:84px}
+  .s-red    {background:var(--red);    width:56px;height:56px}
+  .s-darkred{background:var(--darkred);width:78px;height:78px}
+  .s-yellow {background:var(--yellow); width:150px;height:150px;color:#fff}
+  .s-cyan   {background:var(--cyan);   width:82px;height:82px}
+  .s-green  {background:var(--green);  width:82px;height:82px}
+  .slot.empty{opacity:.42}
+  .s-yellow .slotbody{display:flex;flex-direction:column;align-items:center;justify-content:center;
+                      min-height:52px}
+  .s-yellow .slotbody .val{font-size:30px;line-height:1.1}
+  .s-yellow .slotbody .ph{font-size:13px}
+  .ytoggles{display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:5px}
+  .ytoggles button{font-size:10px;padding:2px 5px;border:1px solid rgba(0,0,0,.3);
+        border-radius:3px;background:rgba(255,255,255,.82);color:#5a3d00;cursor:pointer;
+        font-family:inherit}
+  .ytoggles button.on{background:#3a2a00;color:#ffd766;border-color:#000}
+
+  /* ---- popover ---- */
+  #pop{position:absolute;z-index:50;background:#fff;border:1px solid #999;border-radius:6px;
+       box-shadow:0 6px 22px rgba(0,0,0,.22);padding:8px;display:none;max-width:340px}
+  #pop h3{margin:0 0 6px;font-size:11px;color:#777;font-weight:normal}
+  #pop .opts{display:flex;flex-wrap:wrap;gap:5px}
+  #pop button{font-family:inherit;font-size:12px;padding:5px 9px;border:1px solid #bbb;
+        border-radius:4px;background:#f7f7f7;cursor:pointer}
+  #pop button:hover{background:#e6f0fb;border-color:#7aaede}
+  #pop button.sel{background:#1e6fbf;color:#fff;border-color:#1e6fbf}
+  #pop button code{color:#c0392b;font-size:11px}
+  #pop button.sel code{color:#ffd}
+
+  /* ---- io row ---- */
+  .io{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  #keys{flex:1;min-width:300px;font-family:Consolas,monospace;font-size:16px;padding:8px 10px;
+        border:1px solid #bbb;border-radius:5px}
+  button.act{font-family:inherit;font-size:13px;padding:8px 14px;border:1px solid #bbb;
+        border-radius:5px;background:#f2f2f2;cursor:pointer}
+  button.act:hover{background:#e6e6e6}
+  label.chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer}
+  #parseNote{color:#b06000;font-size:12px;min-height:16px;margin-top:6px}
+  .readout{font-family:Consolas,monospace;font-size:13px;color:#444;margin-top:8px;
+           white-space:pre-wrap;word-break:break-all}
+  .readout b{color:#000}
+  details{margin-top:10px}
+  summary{cursor:pointer;font-size:12px;color:#777}
+  table.sp{border-collapse:collapse;font-size:12px;margin-top:8px}
+  table.sp td{border:1px solid #ddd;padding:3px 7px}
+  table.sp input{width:44px;font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+
+<h1>トイドラ芸大和声フォント — 和声記号 入力ツール <span class="ver">v0.1-alpha（仮バージョン）</span></h1>
+<p class="sub">島岡譲『総合和声』の和音記号を、図の構成スロットから組み立てます。
+記号は <code>ToydoraGeidaiWasei-Regular</code> をCSS参照で表示（埋め込みなし）。</p>
+<p class="alpha"><b>仮バージョンです。</b>記号体系・キー割り当て・スペーシングは検証途中で、今後変更される場合があります。
+表示には<b>「トイドラ芸大和声」フォントがこの端末にインストールされている必要があります</b>（フォントは同梱していません）。</p>
+
+<div class="panel">
+  <h2>プレビュー</h2>
+  <div id="preview"></div>
+  <div id="fontwarn">⚠ ToydoraGeidaiWasei フォントが検出できません。プレビューは正しく表示されません。</div>
+</div>
+
+<div class="panel">
+  <h2>構成</h2>
+  <label class="chk"><input type="checkbox" id="modToggle"> 転調表記あり</label>
+  <div class="stage" id="stage"></div>
+</div>
+
+<div class="panel">
+  <h2>キー列</h2>
+  <div class="io">
+    <input id="keys" spellcheck="false" placeholder="例: 8($/5wd">
+    <button class="act" id="copyBtn">コピー</button>
+    <button class="act" id="clearBtn">クリア</button>
+    <label class="chk"><input type="checkbox" id="spaceToggle" checked> 自動スペーシング</label>
+  </div>
+  <div id="parseNote"></div>
+  <div class="readout" id="readout"></div>
+  <details>
+    <summary>スペーシング調整（境界ごとの半角スペース数）</summary>
+    <p class="sub" style="margin:8px 0 0">半角スペースのみで調整します（CSSの字送り調整は使いません）。
+    プレビューに出ている文字列＝コピーされる文字列です。</p>
+    <div id="spTable"></div>
+  </details>
+</div>
+
+<script>
+"use strict";
+
+/* =======================================================================
+   スロット定義
+   キーは HANDOFF.md §2.2 のキーマップ、順序はマニュアル「入力順」の表
+   （,-8?(=T!i<ZE/Q1qJaA / .^9_)~Y">XRW2wKsS）に一致させている。
+   ======================================================================= */
+
+const DEG_UPPER = [                      // 上付きの度数（「◯度の」）
+  ["!","I度の"],["\"","II度の"],["#","III度の"],["$","IV度の"],
+  ["%","V度の"],["&","VI度の"],["'","VII度の"],["P","□度の（不定）"]
+];
+/* 上付き位置の修飾。プラス／マイナスは和音側の `^`/`-`（ベースライン位置）ではなく
+   上付き位置の専用グリフ `~`/`=` を使う（インク実測: ~ は y −62〜−45 の＋字形、
+   = は y −54 の細い横棒。^ は y −36〜−8、- は y −23 でいずれもベースライン位置）。 */
+const MOD_UPPER = [
+  ["(","準（準固有）"],[")","同主固有"],["~","プラス（長化）"],["=","マイナス（短化）"]
+];
+const MOD_CHORD = [                      // 和音自身の修飾
+  ["8","準（準固有）"],["9","同主固有"],["^","プラス（長化）"],["-","マイナス（短化）"]
+];
+const DEGREES = [
+  ["1","I度"],["2","II度"],["3","III度"],["4","IV度"],
+  ["5","V度"],["6","VI度"],["7","VII度"],["p","□度（不定）"]
+];
+const INVERSIONS = [
+  ["a","1転"],["s","2転"],["d","3転"],["f","4転"],["g","5転"],["h","6転"],["l","□転（不定）"]
+];
+const FORMS = [
+  ["q","7"],["w","9"],["qJ","7-11"],["qK","7-13"],["wJ","9-11"],["wK","9-13"],
+  ["o","□（形体指数の不定）"],
+  ["A","付加6"],["S","付加4"],["D","付加6/4"],["F","付加5"],["G","付加7"],
+  ["H","付加7/5"],["L","付加□"]
+];
+
+/* 描画順（＝キー列の生成順）。id は SPACING の境界名にも使う。 */
+const ORDER = [
+  "chordPM",   // 濃赤: ^ -            （和音のプラス／マイナス）
+  "chordQ",    // 濃赤: 8 9            （和音の準固有／同主固有）
+  "innerQ",    // 赤:   ( )            （内部調の準固有／同主固有）
+  "innerPM",   // 赤:   ~ =            （内部調のプラス／マイナス）
+  "innerHat",  // 紫トグル: Y          （内部調の変位VII調のハット）
+  "innerDeg",  // 紫:   ! 〜 ' P
+  "special",   // 黄トグル: E ナポリII / R 変位VII（旧字体 y）
+  "omit",      // 黄トグル: /          （根省・5省）
+  "alter",     // 黄トグル: Q ↑ / W ↓
+  "degree",    // 黄:   1 〜 7 p
+  "form",      // 黄緑: q w …（形体指数・付加音）
+  "inv"        // 水色: a s d f g h l
+];
+
+/* 転調表記の外側（括弧の左）。マニュアル例 `~#[…]` `T"[…]` `)#[…]` と同じ並び。 */
+const MOD_ORDER = ["modQ","modPM","modDeg"];
+
+const OPEN_PAREN = "[", CLOSE_PAREN = "]";
+
+/* 境界ごとに挿入する半角スペース数。マニュアル巻末の
+   「スペースキー使用例」（~# [,(%/W5w A ／ "5q A ／ B {2q ;;;;）を初期値にし、
+   条件1〜8を満たすようブラウザ上で調整する。 */
+const SPACING = {
+  "modDeg>open"   : 1,   // 内部調（転調表記）の度数 と 開き括弧
+  "open>chordPM"  : 0,   // 開き括弧 と 中身の先頭
+  "chordPM>*"     : 1,   // プラス／マイナスの後
+  "chordQ>*"      : 1,   // 準・同主固有の後
+  "innerPM>*"     : 1,
+  "innerQ>*"      : 0,   // ( ) は上付きなので度数に密着させる
+  "innerDeg>*"    : 0,
+  "degree>form"   : 1,   // 和音の度数 と 形体指数・付加音
+  "degree>inv"    : 1,   // 和音の度数 と 転回指数
+  "form>inv"      : 0,
+  "last>close"    : 1    // 中身の末尾 と 閉じ括弧
+};
+
+/* 和音の度数の直前に入れるスペース数（度数ごと）。
+   このフォントでは / $ Q R Y ( などが「幅0の合成グリフ」で、
+   その時点のペン位置に重ねて描かれる。半角スペース1個 = 0.035em の微調整単位。
+   度数字ごとに字幅が違うので、上付き度数・斜線・ハットの中心を度数字の中心に
+   そろえるのに必要なスペース数も度数ごとに異なる。
+   （100px で描画してインクの水平中心を実測し決定した値） */
+const DEGREE_LEAD = { "1":3, "2":2, "3":1, "4":0, "5":1, "6":0, "7":0, "p":1 };
+
+/* 幅0の合成グリフ。これが度数の前にあるときだけ DEGREE_LEAD を適用する。 */
+const ZERO_WIDTH_PREFIX = ["innerHat","innerDeg","special","omit","alter","innerQ","innerPM"];
+
+/* 上付きの修飾（( ) ~ =、インク右端 19px）の直後に上付き度数を置くときの
+   スペース数。上付き度数はどれも中心 26px だが左端が度数ごとに違う
+   （I:25 II:20 III:16 IV:13 V:16 VI:13 VII:9 □:16）ので、
+   左端が 22px より右に来るだけのスペースを入れて重なりを防ぐ。
+   ここで入れたスペースは後続の度数字も一緒に押すため、縦ぞろえは崩れない。 */
+const UPPER_LEAD = { "!":0, "\"":1, "#":2, "$":3, "%":2, "&":3, "'":4, "P":2 };
+
+/* 転調表記の度数（インク右端 I:27 II:32 III:36 IV:39 V:36 VI:39 VII:43 □:36）と
+   開き括弧 `[`（インク 3〜13、幅16）を分離するのに要るスペース数。
+   括弧のインク左端が度数のインク右端＋3px を越えるように算出した。 */
+const PAREN_LEAD = { "!":8, "\"":10, "#":11, "$":12, "%":11, "&":12, "'":13, "P":11 };
+
+/* =======================================================================
+   状態
+   ======================================================================= */
+const st = {
+  modulation:false,
+  modPM:"", modQ:"", modDeg:"",
+  chordPM:"", chordQ:"", innerPM:"", innerQ:"", innerHat:"",
+  innerDeg:"", special:"", omit:"", alter:"", degree:"", form:"", inv:""
+};
+
+/* =======================================================================
+   キー列の生成（自動スペーシング込み）
+   ======================================================================= */
+
+/* 内側（和音記号本体）の断片列を [slotId, keys] の配列で返す */
+function innerPieces(){
+  const out = [];
+  for (const id of ORDER){
+    const v = st[id];
+    if (v) out.push([id, v]);
+  }
+  return out;
+}
+
+function gap(from, to){
+  if (!SPACING_ON) return 0;
+  const k1 = from + ">" + to, k2 = from + ">*";
+  if (k1 in SPACING) return SPACING[k1];
+  if (k2 in SPACING) return SPACING[k2];
+  return 0;
+}
+
+let SPACING_ON = true;
+
+function build(){
+  const pieces = innerPieces();
+  let inner = "";
+  const hasMark = ZERO_WIDTH_PREFIX.some(k => st[k]);
+  pieces.forEach(([id, v], i) => {
+    if (i > 0){
+      const prev = pieces[i-1][0];
+      if (id === "degree" && hasMark && SPACING_ON){
+        inner += " ".repeat(DEGREE_LEAD[v] || 0);
+      } else if (id === "innerDeg" && SPACING_ON && (prev === "innerQ" || prev === "innerPM")){
+        inner += " ".repeat(UPPER_LEAD[v] || 0);
+      } else {
+        inner += " ".repeat(gap(prev, id));
+      }
+    }
+    inner += v;
+  });
+
+  if (!st.modulation) return inner;
+
+  let prefix = "";
+  for (const id of MOD_ORDER){
+    if (!st[id]) continue;
+    if (id === "modDeg" && prefix && SPACING_ON) prefix += " ".repeat(UPPER_LEAD[st.modDeg] || 0);
+    prefix += st[id];
+  }
+
+  let s = "";
+  if (prefix){
+    const lead = (SPACING_ON && st.modDeg) ? (PAREN_LEAD[st.modDeg] || 0)
+                                           : gap("modDeg","open");
+    s += prefix + " ".repeat(lead);
+  }
+  s += OPEN_PAREN;
+  if (inner) s += " ".repeat(gap("open", pieces.length ? pieces[0][0] : "chordPM")) + inner;
+  s += " ".repeat(gap("last","close")) + CLOSE_PAREN;
+  return s;
+}
+
+/* =======================================================================
+   逆パーサ： キー列 → スロット
+   生成順が固定なので、先頭から「その位置に来うるキー集合」を順に読むだけでよい。
+   ======================================================================= */
+function parse(raw){
+  const reset = {modulation:false,modPM:"",modQ:"",modDeg:"",chordPM:"",chordQ:"",
+                 innerPM:"",innerQ:"",innerHat:"",innerDeg:"",special:"",omit:"",
+                 alter:"",degree:"",form:"",inv:""};
+  let s = raw.replace(/ /g,"");
+  let i = 0, leftover = "";
+  const at = () => s[i];
+  const take = (set) => { if (i<s.length && set.includes(s[i])) return s[i++]; return ""; };
+
+  const upperDegKeys = DEG_UPPER.map(x=>x[0]).join("");
+
+  /* 転調表記: 開き括弧が現れるまでを外側とみなす */
+  const open = s.indexOf(OPEN_PAREN);
+  if (open >= 0){
+    reset.modulation = true;
+    let p = s.slice(0, open);
+    let j = 0;
+    const tk = (set) => { if (j<p.length && set.includes(p[j])) return p[j++]; return ""; };
+    reset.modQ   = tk("()");
+    reset.modPM  = tk("~=");
+    reset.modDeg = tk(upperDegKeys);
+    if (j < p.length) leftover += p.slice(j);
+    s = s.slice(open+1);
+    const close = s.lastIndexOf(CLOSE_PAREN);
+    if (close >= 0) { leftover += s.slice(close+1); s = s.slice(0, close); }
+    i = 0;
+  }
+
+  reset.chordPM  = take("^-");
+  reset.chordQ   = take("89");
+  reset.innerQ   = take("()");
+  reset.innerPM  = take("~=");
+  reset.innerHat = take("Y");
+  reset.innerDeg = take(upperDegKeys);
+  reset.special  = take("ERy");
+  reset.omit     = take("/");
+  reset.alter    = take("QW");
+  reset.degree   = take("1234567p");
+
+  /* 形体指数・付加音（q/w は J/K を伴うことがある） */
+  if (i < s.length && "qwo".includes(s[i])){
+    reset.form = s[i++];
+    if (i < s.length && "JK".includes(s[i])) reset.form += s[i++];
+  } else if (i < s.length && "ASDFGHL".includes(s[i])){
+    reset.form = s[i++];
+  }
+
+  reset.inv = take("asdfghl");
+
+  if (i < s.length) leftover += s.slice(i);
+  return {state:reset, leftover};
+}
+
+/* =======================================================================
+   UI 構築
+   ======================================================================= */
+const stage = document.getElementById("stage");
+const pop   = document.getElementById("pop") || (() => {
+  const d = document.createElement("div"); d.id = "pop"; document.body.appendChild(d); return d;
+})();
+
+function slotEl(cls, id, opts, placeholder, sublabel){
+  const el = document.createElement("div");
+  el.className = "slot " + cls;
+  el.dataset.slot = id;
+  el._opts = opts; el._ph = placeholder; el._sub = sublabel || "";
+  el.addEventListener("click", (e)=>{ e.stopPropagation(); openPop(el); });
+  return el;
+}
+
+function labelFor(opts, v){
+  for (const [k,l] of opts) if (k === v) return l;
+  return v;
+}
+
+function paintSlot(el){
+  const id = el.dataset.slot, v = st[id];
+  el.classList.toggle("empty", !v);
+  const html = v
+    ? `<span class="val">${escapeHtml(labelFor(el._opts, v))}</span>`
+      + (el._sub ? `<small>${el._sub}</small>` : "")
+    : `<span class="ph">${escapeHtml(el._ph)}</span>`;
+  /* .slotbody を持つスロット（黄＝付随トグルがある）は本文だけ差し替える */
+  const body = el.querySelector(".slotbody");
+  if (body) body.innerHTML = html; else el.innerHTML = html;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c =>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+
+let popTarget = null;
+function openPop(el){
+  popTarget = el;
+  const id = el.dataset.slot;
+  pop.innerHTML = "";
+  const h = document.createElement("h3"); h.textContent = el._ph; pop.appendChild(h);
+  const box = document.createElement("div"); box.className = "opts";
+  const mk = (key,label) => {
+    const b = document.createElement("button");
+    b.innerHTML = escapeHtml(label) + (key ? ` <code>${escapeHtml(key)}</code>` : "");
+    if (st[id] === key) b.className = "sel";
+    b.addEventListener("click", ()=>{ st[id] = key; closePop(); refresh(); });
+    box.appendChild(b);
+  };
+  mk("", "（なし）");
+  for (const [k,l] of el._opts) mk(k,l);
+  pop.appendChild(box);
+  const r = el.getBoundingClientRect();
+  pop.style.display = "block";
+  pop.style.left = Math.min(window.scrollX + r.left, window.scrollX + window.innerWidth - 350) + "px";
+  pop.style.top  = (window.scrollY + r.bottom + 6) + "px";
+}
+function closePop(){ pop.style.display = "none"; popTarget = null; }
+document.addEventListener("click", closePop);
+pop.addEventListener("click", e => e.stopPropagation());
+
+/* --- stage layout ------------------------------------------------------ */
+let els = {};
+
+function buildStage(){
+  stage.innerHTML = ""; els = {};
+
+  if (st.modulation){
+    const c = document.createElement("div"); c.className = "modal-cluster";
+    // 橙は「準/同主固有」と「±」の2枠を縦積みして1セルに収める
+    const mQ   = slotEl("s-orange","modQ",  MOD_UPPER.slice(0,2), "転調先の\n準/同主");
+    const mPM  = slotEl("s-orange","modPM", MOD_UPPER.slice(2),   "転調先の\n±");
+    const mDeg = slotEl("s-magenta","modDeg", DEG_UPPER, "内部調(転調表記)の度数");
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "display:flex;flex-direction:column;gap:4px";
+    wrap.appendChild(mQ); wrap.appendChild(mPM);
+    c.appendChild(wrap); c.appendChild(mDeg);
+    stage.appendChild(c);
+    els.modPM = mPM; els.modQ = mQ; els.modDeg = mDeg;
+
+    const p1 = document.createElement("div"); p1.className = "paren"; p1.textContent = "(";
+    stage.appendChild(p1);
+  }
+
+  const chord = document.createElement("div"); chord.className = "chord";
+
+  // 赤（内部調の ±・準固有・同主固有）: 2枠を縦積みして1セルに
+  const redWrap = document.createElement("div");
+  redWrap.className = "cell-inner-mod";
+  redWrap.style.cssText += ";display:flex;flex-direction:column;gap:4px";
+  const iQ  = slotEl("s-red","innerQ",  MOD_UPPER.slice(0,2), "内部調の\n準/同主");
+  const iPM = slotEl("s-red","innerPM", MOD_UPPER.slice(2),   "内部調の\n±");
+  redWrap.appendChild(iQ); redWrap.appendChild(iPM);
+  chord.appendChild(redWrap);
+  els.innerQ = iQ; els.innerPM = iPM;
+
+  // 紫（内部調の度数）＋ ハット Y トグル
+  const iDeg = slotEl("s-purple","innerDeg", DEG_UPPER, "内部調の度数");
+  iDeg.classList.add("cell-inner-deg");
+  chord.appendChild(iDeg);
+  els.innerDeg = iDeg;
+
+  // 濃赤（和音の ±・準固有・同主固有）
+  const cWrap = document.createElement("div");
+  cWrap.className = "cell-chord-mod";
+  cWrap.style.cssText += ";display:flex;flex-direction:column;gap:4px";
+  const cQ  = slotEl("s-darkred","chordQ",  MOD_CHORD.slice(0,2), "和音の\n準/同主");
+  const cPM = slotEl("s-darkred","chordPM", MOD_CHORD.slice(2),   "和音の\n±");
+  cWrap.appendChild(cQ); cWrap.appendChild(cPM);
+  chord.appendChild(cWrap);
+  els.chordQ = cQ; els.chordPM = cPM;
+
+  // 黄（和音の度数）＝他のスロットと同じ選択式（不定 □ を含む）＋付随トグル
+  const yel = slotEl("s-yellow","degree", DEGREES, "和音の度数");
+  yel.classList.add("cell-degree");
+  const body = document.createElement("div");
+  body.className = "slotbody";
+  yel.appendChild(body);
+  const tg = document.createElement("div"); tg.className = "ytoggles";
+  const mkTg = (slot, key, label) => {
+    const b = document.createElement("button");
+    b.textContent = label;
+    if (st[slot] === key) b.classList.add("on");
+    b.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      st[slot] = (st[slot] === key) ? "" : key;
+      refresh();
+    });
+    tg.appendChild(b);
+  };
+  mkTg("omit","/","根省/5省");
+  mkTg("alter","Q","上変↑");
+  mkTg("alter","W","下変↓");
+  mkTg("special","E","ナポリII");
+  mkTg("special","R","変位VII");
+  mkTg("special","y","変位VII(旧)");
+  mkTg("innerHat","Y","内部調ハット");
+  yel.appendChild(tg);
+  chord.appendChild(yel);
+  els.degree = yel;
+
+  // 水色（転回指数）
+  const inv = slotEl("s-cyan","inv", INVERSIONS, "転回指数");
+  inv.classList.add("cell-inv");
+  chord.appendChild(inv);
+  els.inv = inv;
+
+  // 黄緑（形体指数・付加音）
+  const form = slotEl("s-green","form", FORMS, "形体指数\n付加音");
+  form.classList.add("cell-form");
+  chord.appendChild(form);
+  els.form = form;
+
+  stage.appendChild(chord);
+
+  if (st.modulation){
+    const p2 = document.createElement("div"); p2.className = "paren"; p2.textContent = ")";
+    stage.appendChild(p2);
+  }
+
+  for (const k in els){ if (k[0] !== "_" && els[k].dataset && els[k].dataset.slot) paintSlot(els[k]); }
+}
+
+/* --- spacing tuning table --------------------------------------------- */
+const SP_LABELS = {
+  "modDeg>open"  :"内部調(転調表記)の度数 → 開き括弧",
+  "open>chordPM" :"開き括弧 → 中身の先頭",
+  "chordPM>*"    :"プラス/マイナス（和音）の後",
+  "chordQ>*"     :"準/同主固有（和音）の後",
+  "innerPM>*"    :"プラス/マイナス（内部調）の後",
+  "innerQ>*"     :"準/同主固有（内部調）の後",
+  "innerDeg>*"   :"内部調の度数 の後",
+  "degree>form"  :"和音の度数 → 形体指数・付加音",
+  "degree>inv"   :"和音の度数 → 転回指数",
+  "form>inv"     :"形体指数 → 転回指数",
+  "last>close"   :"中身の末尾 → 閉じ括弧"
+};
+function buildSpTable(){
+  const t = document.createElement("table"); t.className = "sp";
+  for (const k in SPACING){
+    const tr = document.createElement("tr");
+    const td1 = document.createElement("td"); td1.textContent = SP_LABELS[k] || k;
+    const td2 = document.createElement("td");
+    const inp = document.createElement("input");
+    inp.type = "number"; inp.min = "0"; inp.max = "8"; inp.value = SPACING[k];
+    inp.addEventListener("input", ()=>{ SPACING[k] = Math.max(0, parseInt(inp.value||"0",10)); refresh(); });
+    td2.appendChild(inp);
+    tr.appendChild(td1); tr.appendChild(td2); t.appendChild(tr);
+  }
+  const NUM = ["I","II","III","IV","V","VI","VII","□"];
+  const perDegRow = (label, tbl, keys) => {
+    const tr = document.createElement("tr");
+    const td1 = document.createElement("td"); td1.textContent = label;
+    const td2 = document.createElement("td");
+    keys.forEach((k, n) => {
+      const lab = document.createElement("span");
+      lab.textContent = " " + NUM[n] + ":"; lab.style.fontSize = "11px";
+      const inp = document.createElement("input");
+      inp.type = "number"; inp.min = "0"; inp.max = "20"; inp.value = tbl[k];
+      inp.style.width = "42px";
+      inp.addEventListener("input", ()=>{
+        tbl[k] = Math.max(0, parseInt(inp.value||"0",10)); refresh();
+      });
+      td2.appendChild(lab); td2.appendChild(inp);
+    });
+    tr.appendChild(td1); tr.appendChild(td2); t.appendChild(tr);
+  };
+  const UPKEYS = ["!","\"","#","$","%","&","'","P"];
+  perDegRow("幅0グリフ → 和音の度数", DEGREE_LEAD, ["1","2","3","4","5","6","7","p"]);
+  perDegRow("上付きの修飾 ( ) ~ = → 内部調の度数", UPPER_LEAD, UPKEYS);
+  perDegRow("転調表記の度数 → 開き括弧 [", PAREN_LEAD, UPKEYS);
+
+  const holder = document.getElementById("spTable");
+  holder.innerHTML = ""; holder.appendChild(t);
+}
+
+/* =======================================================================
+   更新
+   ======================================================================= */
+const preview  = document.getElementById("preview");
+const keysBox  = document.getElementById("keys");
+const readout  = document.getElementById("readout");
+const noteBox  = document.getElementById("parseNote");
+
+function describe(){
+  const parts = [];
+  const push = (id, opts) => { if (st[id]) parts.push(labelFor(opts, st[id])); };
+  if (st.modulation){
+    push("modPM", MOD_UPPER); push("modQ", MOD_UPPER); push("modDeg", DEG_UPPER);
+    if (parts.length) parts.push("への転調内で:");
+  }
+  push("chordPM", MOD_CHORD); push("chordQ", MOD_CHORD);
+  push("innerPM", MOD_UPPER); push("innerQ", MOD_UPPER);
+  if (st.innerHat) parts.push("変位VII調");
+  push("innerDeg", DEG_UPPER);
+  if (st.special === "E") parts.push("ナポリの");
+  if (st.special === "R" || st.special === "y") parts.push("変位VIIの");
+  if (st.omit) parts.push("根省/5省");
+  if (st.alter === "Q") parts.push("上変");
+  if (st.alter === "W") parts.push("下変");
+  push("degree", DEGREES); push("form", FORMS); push("inv", INVERSIONS);
+  return parts.join(" ") || "（未入力）";
+}
+
+function refresh(skipStage){
+  SPACING_ON = document.getElementById("spaceToggle").checked;
+  if (!skipStage) buildStage(); else {
+    for (const k in els){ if (k[0] !== "_" && els[k].dataset && els[k].dataset.slot) paintSlot(els[k]); }
+  }
+  const out = build();
+  preview.textContent = out;
+  keysBox.value = out;
+  readout.innerHTML = "<b>読み:</b> " + escapeHtml(describe());
+  noteBox.textContent = "";
+}
+
+keysBox.addEventListener("input", ()=>{
+  const {state, leftover} = parse(keysBox.value);
+  Object.assign(st, state);
+  document.getElementById("modToggle").checked = st.modulation;
+  buildStage();
+  preview.textContent = keysBox.value;   // 生入力をそのまま描画（殺さない）
+  readout.innerHTML = "<b>読み:</b> " + escapeHtml(describe());
+  noteBox.textContent = leftover
+    ? "逆パースできなかった文字: " + leftover + "（プレビューは入力どおり表示しています）"
+    : "";
+});
+
+document.getElementById("modToggle").addEventListener("change", e=>{
+  st.modulation = e.target.checked; refresh();
+});
+document.getElementById("spaceToggle").addEventListener("change", ()=>refresh());
+document.getElementById("clearBtn").addEventListener("click", ()=>{
+  for (const k in st) if (k !== "modulation") st[k] = "";
+  refresh();
+});
+document.getElementById("copyBtn").addEventListener("click", async ()=>{
+  try { await navigator.clipboard.writeText(keysBox.value); noteBox.textContent = "コピーしました。"; }
+  catch(_) { keysBox.select(); document.execCommand("copy"); noteBox.textContent = "コピーしました。"; }
+});
+
+/* フォント検出 */
+function fontMissing(){
+  if (!document.fonts || !document.fonts.check) return false;
+  return !document.fonts.check('64px "ToydoraGeidaiWasei"')
+      && !document.fonts.check('64px "ToydoraGeidaiWasei-Regular"');
+}
+
+buildSpTable();
+refresh();
+if (fontMissing()) document.getElementById("fontwarn").style.display = "block";
+</script>
+</body>
+</html>
