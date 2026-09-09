@@ -17,7 +17,7 @@
 `font-family: "ToydoraGeidaiWasei"` を参照するだけなので、
 フォント未導入の環境ではプレビューが正しく表示されません（その旨の警告が出ます）。
 
-フォントは [トイドラの音楽工房](https://booth.pm/ja/items/3529220) で配布されているものです。
+フォントは [トイドラの音楽工房](https://toydora-music.stores.jp/) で公開されているものです。
 
 ## できること
 
