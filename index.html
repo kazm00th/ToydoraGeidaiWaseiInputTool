@@ -349,8 +349,13 @@ function build(){
       const prev = pieces[i-1][0];
       if (id === "degree" && hasMark && SPACING_ON){
         inner += " ".repeat(degreeLead(v));
-      } else if (id === "innerDeg" && SPACING_ON && (prev === "innerQ" || prev === "innerPM")){
-        inner += " ".repeat(upperLead(v));
+      } else if ((id === "innerDeg" || id === "innerHat") && SPACING_ON
+                 && (prev === "innerQ" || prev === "innerPM")){
+        /* 変位VII のハット `Y` は上付き度数に密着させるので、両者を1つの塊として
+           扱い、リードはその手前（＝修飾の直後）にまとめて入れる。
+           `Y` があるときに innerDeg 側で判定すると prev が innerHat になって
+           リードが飛んでしまうため、先に来るほうで入れる。 */
+        inner += " ".repeat(upperLead(st.innerDeg));
       } else {
         inner += " ".repeat(gap(prev, id));
       }
