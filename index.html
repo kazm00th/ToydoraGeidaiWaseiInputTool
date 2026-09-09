@@ -280,7 +280,9 @@ const ALTER_CLEAR = { "Q":6, "W":7 };   // 修飾のインクを越えるのに�
 function upperLead(u){
   const base = UPPER_LEAD[u] || 0;
   if (!st.alter) return base;
-  return Math.max(base, (ALTER_CLEAR[st.alter] || 0) - degreeLead(st.degree));
+  /* 上変・下変は上付き度数の直後（度数のリードより前）に置かれるので、
+     必要なスペース数から degreeLead を引いてはいけない。 */
+  return Math.max(base, ALTER_CLEAR[st.alter] || 0);
 }
 
 /* 閉じ括弧の直前に入れるスペース数。直前が幅0グリフのときだけ実測値から算出する。 */
