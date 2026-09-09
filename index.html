@@ -260,11 +260,27 @@ const ZW_INK_RIGHT = {
 };
 const SPACE_PX = 3.515625;   // 100px 描画時の半角スペース幅
 
-/* 度数の直前に入れるスペース数。何が度数に重なるかで基準が変わる。 */
+/* 度数の直前に入れるスペース数。何が度数に重なるかで基準が変わる。
+   上付き度数・根省の斜線がある場合は「中心をそろえる」ことを優先し、
+   上変・下変は度数字の左上セリフに最小限重なる位置に落ちる。
+   そろえる相手が無いときだけ ALTER_LEAD で上変・下変をセリフ左端に接させる。 */
 function degreeLead(deg){
-  if (st.alter) return (ALTER_LEAD[st.alter] || {})[deg] || 0;
+  if (st.innerDeg || st.omit) return DEGREE_LEAD[deg] || 0;
   if (st.special === "R" || st.special === "y") return R_LEAD[deg] || 0;
+  if (st.alter) return (ALTER_LEAD[st.alter] || {})[deg] || 0;
   return DEGREE_LEAD[deg] || 0;
+}
+
+/* 上付きの修飾 ( ) ~ =（インク右端 19）と上付き度数の間に入れるスペース数。
+   上変 `Q`（インク 3〜9）／下変 `W`（インク −3〜6）が付くときは、その記号も
+   修飾のインクを越えなければならない。上変・下変は上付き度数と度数の間に
+   入るので、ここを広げると上変・下変と度数がまとめて右へ動き、
+   中心そろえ（degreeLead）を壊さずに重なりだけを解消できる。 */
+const ALTER_CLEAR = { "Q":6, "W":7 };   // 修飾のインクを越えるのに要る総スペース数
+function upperLead(u){
+  const base = UPPER_LEAD[u] || 0;
+  if (!st.alter) return base;
+  return Math.max(base, (ALTER_CLEAR[st.alter] || 0) - degreeLead(st.degree));
 }
 
 /* 閉じ括弧の直前に入れるスペース数。直前が幅0グリフのときだけ実測値から算出する。 */
@@ -334,7 +350,7 @@ function build(){
       if (id === "degree" && hasMark && SPACING_ON){
         inner += " ".repeat(degreeLead(v));
       } else if (id === "innerDeg" && SPACING_ON && (prev === "innerQ" || prev === "innerPM")){
-        inner += " ".repeat(UPPER_LEAD[v] || 0);
+        inner += " ".repeat(upperLead(v));
       } else {
         inner += " ".repeat(gap(prev, id));
       }
